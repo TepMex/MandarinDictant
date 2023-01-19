@@ -58,10 +58,16 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+enum DictantTasks { countSyllables, recognizeTones, recoginizePinyin }
+
 class _MyHomePageState extends State<MyHomePage> {
   late DictantController _dictantController;
   late Future _contentLoading;
-  VideoPlayerWidget videoPlayer = const VideoPlayerWidget();
+  final _videoPlayer = const VideoPlayerWidget();
+  final _keyEditingController = TextEditingController();
+  late DictantItem _currentDictant;
+  final _currentTask = DictantTasks.countSyllables;
+  var _score = 0;
 
   @override
   void initState() {
@@ -82,23 +88,63 @@ class _MyHomePageState extends State<MyHomePage> {
               if (snapshot.connectionState != ConnectionState.done) {
                 return const CircularProgressIndicator();
               }
+              _currentDictant = _dictantController.nextTask();
               return mainScreen();
             }),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            context
-                .read<DictantBloc>()
-                .nextVideo(_dictantController.nextVideo());
+            var answer = _keyEditingController.text;
+            var isCorrect = checkAnswer(answer);
+            if (isCorrect) {
+              setState(() {
+                _score++;
+              });
+            }
+            _keyEditingController.clear();
+            _currentDictant = _dictantController.nextTask();
+            context.read<DictantBloc>().nextVideo(_currentDictant.filePath);
           },
-          // child: Icon(
-          //   _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-          // ),
+          child: const Icon(Icons.check),
         ));
   }
 
   Widget mainScreen() {
-    return Center(
-      child: videoPlayer,
+    return Column(
+      children: [
+        Center(
+          child: _videoPlayer,
+        ),
+        TextField(
+          controller: _keyEditingController,
+          decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'How many syllables in this audio fragment?'),
+        ),
+        Text('$_score'),
+      ],
     );
+  }
+
+  bool checkAnswer(answer) {
+    switch (_currentTask) {
+      case DictantTasks.countSyllables:
+        return checkCountSyllables(_currentDictant, answer);
+      case DictantTasks.recognizeTones:
+        return checkTones(_currentDictant, answer);
+      case DictantTasks.recoginizePinyin:
+        return checkPinyin(_currentDictant, answer);
+    }
+  }
+
+  bool checkCountSyllables(DictantItem currentDictant, String answer) {
+    return int.parse(answer) == currentDictant.syllableCount;
+  }
+
+  bool checkTones(DictantItem currentDictant, String answer) {
+    return false;
+  }
+
+  bool checkPinyin(DictantItem currentDictant, String answer) {
+    return false;
   }
 }

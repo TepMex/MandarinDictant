@@ -7,6 +7,7 @@ import 'package:mandarin_dictant/models/dictant_item.dart';
 class DictantController extends ChangeNotifier {
   bool isContentLoaded = false;
   List<DictantItem> _items = List.empty();
+  int _current = 0;
 
   Future<void> loadContent() async {
     final manifestJson = await rootBundle.loadString('AssetManifest.json');
@@ -24,11 +25,13 @@ class DictantController extends ChangeNotifier {
     isContentLoaded = _items.isNotEmpty;
   }
 
-  nextVideo() {
-    if (_items.isNotEmpty) {
-      return _items.last.filePath;
+  nextTask() {
+    if (_items.length > _current) {
+      var result = _items[_current];
+      _current++;
+      return result;
     }
 
-    return '';
+    return null;
   }
 }
