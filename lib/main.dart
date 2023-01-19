@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mandarin_dictant/dictant_bloc.dart';
 import 'package:mandarin_dictant/dictant_controller.dart';
 import 'package:mandarin_dictant/models/dictant_item.dart';
 import 'package:mandarin_dictant/video_player_widget.dart';
@@ -40,7 +42,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
-      home: const MyHomePage(title: 'Mandarin Dictant'),
+      home: BlocProvider(
+          create: (_) => DictantBloc(),
+          child: const MyHomePage(title: 'Mandarin Dictant')),
     );
   }
 }
@@ -82,14 +86,9 @@ class _MyHomePageState extends State<MyHomePage> {
             }),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            setState(() {
-              //   if (videoPlayer.controller.value.isPlaying) {
-              //     _controller.pause();
-              //   } else {
-              //     _controller.play();
-              //   }
-              // });
-            });
+            context
+                .read<DictantBloc>()
+                .nextVideo(_dictantController.nextVideo());
           },
           // child: Icon(
           //   _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,

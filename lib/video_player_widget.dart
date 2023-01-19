@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'dart:html';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mandarin_dictant/dictant_bloc.dart';
 import 'package:video_player/video_player.dart';
+import 'package:path/path.dart' as p;
 
 class VideoPlayerWidget extends StatefulWidget {
   const VideoPlayerWidget({super.key});
@@ -19,8 +21,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void initState() {
     super.initState();
 
-    _controller = VideoPlayerController.network(
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
+    _controller = VideoPlayerController.asset(
+      'content/Vws4DE7UvtM/dummy.mp4',
     );
 
     _initializeVideoPlayerFuture = _controller.initialize();
@@ -35,18 +37,23 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _initializeVideoPlayerFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          return videoPlayerScreen();
-        } else {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-      },
-    );
+    return BlocBuilder<DictantBloc, String>(builder: (context, nextUri) {
+      var nextPath = p.join('content', nextUri);
+      _controller = VideoPlayerController.asset(nextPath);
+      _initializeVideoPlayerFuture = _controller.initialize();
+      return FutureBuilder(
+        future: _initializeVideoPlayerFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return videoPlayerScreen();
+          } else {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+        },
+      );
+    });
   }
 
   Widget videoPlayerScreen() {

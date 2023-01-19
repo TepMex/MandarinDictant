@@ -23,4 +23,12 @@ class DictantController extends ChangeNotifier {
         jsonConfig.map((jsonItem) => DictantItem.fromJson(jsonItem)).toList();
     isContentLoaded = _items.isNotEmpty;
   }
+
+  nextVideo() {
+    if (_items.isNotEmpty) {
+      return _items.last.filePath;
+    }
+
+    return '';
+  }
 }
