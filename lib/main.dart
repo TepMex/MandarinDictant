@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,6 @@ import 'package:mandarin_dictant/dictant_bloc.dart';
 import 'package:mandarin_dictant/dictant_controller.dart';
 import 'package:mandarin_dictant/models/dictant_item.dart';
 import 'package:mandarin_dictant/video_player_widget.dart';
-import 'package:video_player/video_player.dart';
 
 Future<void> initializeContent() async {
   final manifestJson = await rootBundle.loadString('AssetManifest.json');
@@ -20,7 +20,6 @@ Future<void> initializeContent() async {
 
   var jsonConfigStr = await rootBundle.loadString(jsonConfigFile);
   var jsonConfig = jsonDecode(jsonConfigStr) as List<dynamic>;
-  var test = DictantItem.fromJson(jsonConfig[0]);
   var dictantItems =
       jsonConfig.map((jsonItem) => DictantItem.fromJson(jsonItem)).toList();
   assert(dictantItems.runtimeType == List<DictantItem>);
@@ -66,14 +65,22 @@ class _MyHomePageState extends State<MyHomePage> {
   final _videoPlayer = const VideoPlayerWidget();
   final _keyEditingController = TextEditingController();
   late DictantItem _currentDictant;
-  final _currentTask = DictantTasks.countSyllables;
+  var _currentTask = DictantTasks.countSyllables;
   var _score = 0;
+  var _lastCorrectAnswer = '';
+  final Map<DictantTasks, String> taskDescriptions = {
+    DictantTasks.countSyllables: 'How many syllables in this audio fragment?',
+    DictantTasks.recoginizePinyin: 'Write pinyin with tone numbers',
+    DictantTasks.recognizeTones: 'Write tone numbers',
+  };
 
   @override
   void initState() {
     super.initState();
     _dictantController = DictantController();
-    _contentLoading = _dictantController.loadContent();
+    _contentLoading = _dictantController
+        .loadContent()
+        .then((value) => _currentDictant = _dictantController.nextTask());
   }
 
   @override
@@ -88,39 +95,79 @@ class _MyHomePageState extends State<MyHomePage> {
               if (snapshot.connectionState != ConnectionState.done) {
                 return const CircularProgressIndicator();
               }
-              _currentDictant = _dictantController.nextTask();
               return mainScreen();
             }),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            var answer = _keyEditingController.text;
-            var isCorrect = checkAnswer(answer);
-            if (isCorrect) {
-              setState(() {
-                _score++;
-              });
-            }
-            _keyEditingController.clear();
-            _currentDictant = _dictantController.nextTask();
-            context.read<DictantBloc>().nextVideo(_currentDictant.filePath);
+            onAnswer();
           },
           child: const Icon(Icons.check),
         ));
+  }
+
+  void onAnswer() {
+    var answer = _keyEditingController.text;
+    var isCorrect = checkAnswer(answer);
+    if (isCorrect) {
+      setState(() {
+        _score += pow(2, _currentTask.index) as int;
+      });
+    }
+    showCorrectAnswer();
+
+    _keyEditingController.clear();
+    nextTaskOrNextPart();
+  }
+
+  void nextTaskOrNextPart() {
+    if (_currentTask == DictantTasks.recoginizePinyin) {
+      goToNextPart();
+      return;
+    }
+
+    goToNextTask();
+  }
+
+  void goToNextTask() {
+    var nextTask = getNextTask(_currentTask);
+    setState(() {
+      _currentTask = nextTask;
+    });
+  }
+
+  void goToNextPart() {
+    setState(() {
+      _currentDictant = _dictantController.nextTask();
+      _currentTask = DictantTasks.countSyllables;
+    });
+    context.read<DictantBloc>().nextVideo(_currentDictant.filePath);
   }
 
   Widget mainScreen() {
     return Column(
       children: [
         Center(
+            child: Text(
+          'Score: $_score',
+          style: const TextStyle(fontSize: 36),
+        )),
+        Center(
           child: _videoPlayer,
         ),
         TextField(
           controller: _keyEditingController,
-          decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'How many syllables in this audio fragment?'),
+          onSubmitted: (value) {
+            onAnswer();
+          },
+          decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              hintText: taskDescriptions[_currentTask]),
         ),
-        Text('$_score'),
+        Center(
+            child: Text(
+          'Last correct anwer: $_lastCorrectAnswer',
+          style: const TextStyle(fontSize: 24),
+        )),
       ],
     );
   }
@@ -141,10 +188,52 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   bool checkTones(DictantItem currentDictant, String answer) {
-    return false;
+    var answArr = answer.split('');
+    for (var i = 0; i < answArr.length; i++) {
+      if (int.parse(answArr[i]) != currentDictant.tones[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool checkPinyin(DictantItem currentDictant, String answer) {
-    return false;
+    var answArr = answer.split(' ');
+    for (var i = 0; i < answArr.length; i++) {
+      if (answArr[i] != currentDictant.pinyinSyllables[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  getNextTask(DictantTasks currentTask) {
+    switch (currentTask) {
+      case DictantTasks.countSyllables:
+        return DictantTasks.recognizeTones;
+      case DictantTasks.recognizeTones:
+        return DictantTasks.recoginizePinyin;
+      case DictantTasks.recoginizePinyin:
+        return DictantTasks.recoginizePinyin;
+    }
+  }
+
+  void showCorrectAnswer() {
+    var correctAnswer = '';
+    switch (_currentTask) {
+      case DictantTasks.countSyllables:
+        correctAnswer = _currentDictant.syllableCount.toString();
+        break;
+      case DictantTasks.recognizeTones:
+        correctAnswer = _currentDictant.tones.join(', ');
+        break;
+      case DictantTasks.recoginizePinyin:
+        correctAnswer = _currentDictant.pinyinSyllables.join(' ');
+        break;
+    }
+
+    setState(() {
+      _lastCorrectAnswer = correctAnswer;
+    });
   }
 }
