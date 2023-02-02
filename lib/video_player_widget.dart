@@ -91,9 +91,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 
   SizedBox videoContent() {
+    var screenHeight = MediaQuery.of(context).size.height;
+    var screenWidth = MediaQuery.of(context).size.width;
+    var widthCoeff = 1;
+    var heightCoeff = 0.75;
+    if (screenHeight > screenWidth) {
+      heightCoeff = 0.5;
+    }
     return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height * 0.75,
+      width: MediaQuery.of(context).size.width * widthCoeff,
+      height: MediaQuery.of(context).size.height * heightCoeff,
       child: AspectRatio(
         aspectRatio: _controller.value.aspectRatio,
         child: VideoPlayer(_controller),

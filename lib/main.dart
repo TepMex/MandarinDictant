@@ -8,6 +8,7 @@ import 'package:mandarin_dictant/dictant_bloc.dart';
 import 'package:mandarin_dictant/dictant_controller.dart';
 import 'package:mandarin_dictant/models/dictant_item.dart';
 import 'package:mandarin_dictant/video_player_widget.dart';
+import 'package:mandarin_dictant/zip_file_picker.dart';
 
 Future<void> initializeContent() async {
   final manifestJson = await rootBundle.loadString('AssetManifest.json');
@@ -57,7 +58,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-enum DictantTasks { countSyllables, recognizeTones, recoginizePinyin }
+enum DictantTasks { countSyllables, recognizeTones, recoginizePinyin, cloze }
 
 class _MyHomePageState extends State<MyHomePage> {
   late DictantController _dictantController;
@@ -72,6 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
     DictantTasks.countSyllables: 'How many syllables in this audio fragment?',
     DictantTasks.recoginizePinyin: 'Write pinyin with tone numbers',
     DictantTasks.recognizeTones: 'Write tone numbers',
+    DictantTasks.cloze: 'Fill in the gaps',
   };
 
   @override
@@ -86,6 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: Text(widget.title),
         ),
@@ -146,6 +149,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget mainScreen() {
     return Column(
       children: [
+        ZipFilePicker(onFilesInZipSelected: onFilesInZipSelected),
         Center(
             child: Text(
           'Score: $_score',
@@ -180,6 +184,8 @@ class _MyHomePageState extends State<MyHomePage> {
         return checkTones(_currentDictant, answer);
       case DictantTasks.recoginizePinyin:
         return checkPinyin(_currentDictant, answer);
+      case DictantTasks.cloze:
+        return checkCloze(_currentDictant, answer);
     }
   }
 
@@ -215,6 +221,9 @@ class _MyHomePageState extends State<MyHomePage> {
         return DictantTasks.recoginizePinyin;
       case DictantTasks.recoginizePinyin:
         return DictantTasks.recoginizePinyin;
+      case DictantTasks.cloze:
+        // TODO: Handle this case.
+        break;
     }
   }
 
@@ -230,10 +239,23 @@ class _MyHomePageState extends State<MyHomePage> {
       case DictantTasks.recoginizePinyin:
         correctAnswer = _currentDictant.pinyinSyllables.join(' ');
         break;
+      case DictantTasks.cloze:
+        // TODO: Handle this case.
+        break;
     }
 
     setState(() {
       _lastCorrectAnswer = correctAnswer;
     });
+  }
+
+  bool checkCloze(DictantItem currentDictant, answer) {
+    return false;
+  }
+
+  void onFilesInZipSelected(Map<String, Uint8List> value) {
+    for (var filename in value.keys) {
+      print(filename);
+    }
   }
 }
