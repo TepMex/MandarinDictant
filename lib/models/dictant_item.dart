@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'dictant_item.g.dart';
@@ -20,6 +21,8 @@ class DictantItem {
 
   @JsonKey(name: 'hanzi')
   final String hanzi;
+
+  Uint8List bytes = Uint8List.fromList([]);
 
   DictantItem(this.id, this.filePath, this.syllableCount, this.tones,
       this.pinyinSyllables, this.hanzi);

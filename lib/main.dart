@@ -1,35 +1,20 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mandarin_dictant/dictant_bloc.dart';
 import 'package:mandarin_dictant/dictant_controller.dart';
 import 'package:mandarin_dictant/models/dictant_item.dart';
 import 'package:mandarin_dictant/video_player_widget.dart';
 import 'package:mandarin_dictant/zip_file_picker.dart';
-
-Future<void> initializeContent() async {
-  final manifestJson = await rootBundle.loadString('AssetManifest.json');
-  final files = json.decode(manifestJson) as Map;
-  final jsonConfigFile = files.keys
-      .firstWhere((key) =>
-          key.toString().startsWith('content/Vws4DE7UvtM/') &&
-          key.toString().endsWith('.json'))
-      .toString();
-
-  var jsonConfigStr = await rootBundle.loadString(jsonConfigFile);
-  var jsonConfig = jsonDecode(jsonConfigStr) as List<dynamic>;
-  var dictantItems =
-      jsonConfig.map((jsonItem) => DictantItem.fromJson(jsonItem)).toList();
-  assert(dictantItems.runtimeType == List<DictantItem>);
-}
+import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeContent();
-  runApp(const MyApp());
+  runApp(ChangeNotifierProvider(
+    create: (context) => DictantController(),
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -60,14 +45,12 @@ class MyHomePage extends StatefulWidget {
 
 enum DictantTasks { countSyllables, recognizeTones, recoginizePinyin, cloze }
 
-class _MyHomePageState extends State<MyHomePage> {
-  late DictantController _dictantController;
-  late Future _contentLoading;
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final _videoPlayer = const VideoPlayerWidget();
   final _keyEditingController = TextEditingController();
-  late DictantItem _currentDictant;
   var _currentTask = DictantTasks.countSyllables;
   var _score = 0;
+  var _zipLoadedOnce = false;
   var _lastCorrectAnswer = '';
   final Map<DictantTasks, String> taskDescriptions = {
     DictantTasks.countSyllables: 'How many syllables in this audio fragment?',
@@ -79,10 +62,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _dictantController = DictantController();
-    _contentLoading = _dictantController
-        .loadContent()
-        .then((value) => _currentDictant = _dictantController.nextTask());
   }
 
   @override
@@ -92,20 +71,33 @@ class _MyHomePageState extends State<MyHomePage> {
         appBar: AppBar(
           title: Text(widget.title),
         ),
-        body: FutureBuilder(
-            future: _contentLoading,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const CircularProgressIndicator();
-              }
-              return mainScreen();
-            }),
+        body: Consumer<DictantController>(builder: (context, notifier, widget) {
+          return appBody();
+        }),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
             onAnswer();
           },
           child: const Icon(Icons.check),
         ));
+  }
+
+  Widget appBody() {
+    if (!Provider.of<DictantController>(context, listen: false)
+        .isContentLoaded) {
+      return Center(
+        child: ZipFilePicker(
+            onFilesInZipSelected:
+                Provider.of<DictantController>(context, listen: false)
+                    .loadZippedContent),
+      );
+    }
+    if (!_zipLoadedOnce) {
+      context.read<DictantBloc>().nextItem(
+          Provider.of<DictantController>(context, listen: false).currentItem);
+      _zipLoadedOnce = true;
+    }
+    return mainScreen();
   }
 
   void onAnswer() {
@@ -140,21 +132,25 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void goToNextPart() {
     setState(() {
-      _currentDictant = _dictantController.nextTask();
+      Provider.of<DictantController>(context, listen: false).nextTask();
       _currentTask = DictantTasks.countSyllables;
     });
-    context.read<DictantBloc>().nextVideo(_currentDictant.filePath);
+    context.read<DictantBloc>().nextItem(
+        Provider.of<DictantController>(context, listen: false).currentItem);
   }
 
   Widget mainScreen() {
     return Column(
       children: [
-        ZipFilePicker(onFilesInZipSelected: onFilesInZipSelected),
-        Center(
-            child: Text(
-          'Score: $_score',
-          style: const TextStyle(fontSize: 36),
-        )),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Score: $_score',
+              style: const TextStyle(fontSize: 36),
+            ),
+          ],
+        ),
         Center(
           child: _videoPlayer,
         ),
@@ -177,15 +173,17 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   bool checkAnswer(answer) {
+    var currentItem =
+        Provider.of<DictantController>(context, listen: false).currentItem;
     switch (_currentTask) {
       case DictantTasks.countSyllables:
-        return checkCountSyllables(_currentDictant, answer);
+        return checkCountSyllables(currentItem, answer);
       case DictantTasks.recognizeTones:
-        return checkTones(_currentDictant, answer);
+        return checkTones(currentItem, answer);
       case DictantTasks.recoginizePinyin:
-        return checkPinyin(_currentDictant, answer);
+        return checkPinyin(currentItem, answer);
       case DictantTasks.cloze:
-        return checkCloze(_currentDictant, answer);
+        return checkCloze(currentItem, answer);
     }
   }
 
@@ -229,15 +227,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void showCorrectAnswer() {
     var correctAnswer = '';
+
+    var currentItem =
+        Provider.of<DictantController>(context, listen: false).currentItem;
     switch (_currentTask) {
       case DictantTasks.countSyllables:
-        correctAnswer = _currentDictant.syllableCount.toString();
+        correctAnswer = currentItem.syllableCount.toString();
         break;
       case DictantTasks.recognizeTones:
-        correctAnswer = _currentDictant.tones.join(', ');
+        correctAnswer = currentItem.tones.join(', ');
         break;
       case DictantTasks.recoginizePinyin:
-        correctAnswer = _currentDictant.pinyinSyllables.join(' ');
+        correctAnswer = currentItem.pinyinSyllables.join(' ');
         break;
       case DictantTasks.cloze:
         // TODO: Handle this case.
@@ -251,11 +252,5 @@ class _MyHomePageState extends State<MyHomePage> {
 
   bool checkCloze(DictantItem currentDictant, answer) {
     return false;
-  }
-
-  void onFilesInZipSelected(Map<String, Uint8List> value) {
-    for (var filename in value.keys) {
-      print(filename);
-    }
   }
 }

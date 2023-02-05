@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mandarin_dictant/dictant_bloc.dart';
+import 'package:mandarin_dictant/models/dictant_item.dart';
+import 'package:mandarin_dictant/video_utils/io_bytes_parser.dart';
+import 'package:mandarin_dictant/video_utils/web_bytes_parser.dart';
 import 'package:video_player/video_player.dart';
-import 'package:path/path.dart' as p;
 
 class VideoPlayerWidget extends StatefulWidget {
   const VideoPlayerWidget({super.key});
@@ -37,9 +40,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<DictantBloc, String>(builder: (context, nextUri) {
-      var nextPath = p.join('content', nextUri);
-      _controller = VideoPlayerController.asset(nextPath);
+    return BlocBuilder<DictantBloc, DictantItem>(builder: (context, item) {
+      if (item.bytes.isEmpty) {
+        return const Text('error');
+      }
+      if (kIsWeb) {
+        _controller =
+            VideoPlayerController.network(WebBytesParser.parse(item.bytes));
+      } else {
+        _controller =
+            VideoPlayerController.file(IoBytesParser.parse(item.bytes));
+      }
       _initializeVideoPlayerFuture = _controller.initialize();
       return FutureBuilder(
         future: _initializeVideoPlayerFuture,
