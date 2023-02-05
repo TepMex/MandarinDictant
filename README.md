@@ -1,4 +1,4 @@
-# mandarin_dictant
+# Mandarin Dictant
 
 ### To generate JSON mappings
 

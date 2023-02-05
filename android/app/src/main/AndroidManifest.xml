@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.mandarin_dictant">
    <application
-        android:label="mandarin_dictant"
+        android:label="Mandarin Dictant"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
