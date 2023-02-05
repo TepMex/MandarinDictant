@@ -88,7 +88,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
           ElevatedButton(
               child: _controller.value.isPlaying
                   ? const Icon(Icons.pause)
-                  : const Icon(Icons.replay),
+                  : const Icon(Icons.play_arrow),
               onPressed: () {
                 if (_controller.value.isPlaying) {
                   _controller.pause();
